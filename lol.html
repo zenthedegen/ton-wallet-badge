@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TON Wallet Badge Generator</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: linear-gradient(to bottom, #e6f7ff, #ffffff);
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      min-height: 100vh;
+      padding-top: 40px;
+    }
+    .container {
+      background-color: #0098EA;
+      color: white;
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.2);
+      width: 400px;
+      max-width: 95vw;
+      text-align: center;
+      transform: scale(0.95);
+      transition: transform 0.3s ease;
+    }
+    .container.scaled {
+      transform: scale(1);
+    }
+    input, button {
+      width: 100%;
+      padding: 10px;
+      margin-top: 15px;
+      font-size: 16px;
+      border-radius: 8px;
+      border: none;
+      outline: none;
+    }
+    button {
+      background-color: white;
+      color: #0098EA;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    .badges {
+      margin-top: 20px;
+      background: white;
+      color: #333;
+      border-radius: 12px;
+      padding: 20px;
+    }
+    .badge {
+      background: #e0f7ff;
+      color: #007bbf;
+      margin: 5px 0;
+      padding: 10px;
+      border-radius: 8px;
+      font-weight: bold;
+    }
+    .loader {
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container" id="container">
+    <h2>🏅 TON WALLET BADGE GENERATOR</h2>
+    <input type="text" id="wallet" placeholder="Enter TON Wallet Address" oninput="scaleContainer()" />
+    <button onclick="generateBadges()">Scan Wallet</button>
+    <div class="loader" id="loader" style="display:none; color:white;">Loading...</div>
+    <div class="badges" id="badgeOutput"></div>
+  </div>
+
+  <script>
+    const tonApiKey = "AEG6F2YPCIT7YRIAAAAIU5HAF5DFKRPRZCOCGCDEQHEHARFQRRGRTHQOD23Z4HQVWT6V3GQ";
+
+    function scaleContainer() {
+      const container = document.getElementById("container");
+      const walletInput = document.getElementById("wallet").value.trim();
+      if (walletInput.length > 0) {
+        container.classList.add("scaled");
+      } else {
+        container.classList.remove("scaled");
+      }
+    }
+
+    async function generateBadges() {
+      const wallet = document.getElementById("wallet").value.trim();
+      const badgeOutput = document.getElementById("badgeOutput");
+      const loader = document.getElementById("loader");
+
+      badgeOutput.innerHTML = "";
+      loader.style.display = "block";
+
+      if (!wallet) {
+        loader.style.display = "none";
+        badgeOutput.innerHTML = "<strong>Please enter a wallet address.</strong>";
+        return;
+      }
+
+      try {
+        const res = await fetch(`https://corsproxy.io/?https://tonapi.io/v2/accounts/${wallet}/jettons`, {
+          headers: { Authorization: `Bearer ${tonApiKey}` }
+        });
+        if (!res.ok) throw new Error("Jetton fetch failed");
+        const data = await res.json();
+
+        let badges = [];
+        const totalJettons = data.balances.length;
+
+        const whale = data.balances.find(j => parseFloat(j.balance) / 10 ** j.jetton.decimals > 10000);
+        if (whale) badges.push("🐋 Whale Holder");
+
+        if (totalJettons >= 5) badges.push("📦 Jetton Collector");
+
+        const txs = await fetch(`https://corsproxy.io/?https://tonapi.io/v2/accounts/${wallet}/transactions?limit=1`, {
+          headers: { Authorization: `Bearer ${tonApiKey}` }
+        });
+        if (!txs.ok) throw new Error("Transaction fetch failed");
+        const txData = await txs.json();
+        const firstTxDate = txData.transactions[0]?.utime;
+        if (firstTxDate && firstTxDate < 1704067200) {
+          badges.push("⏳ Early Buyer");
+        }
+
+        if (badges.length === 0) badges.push("🔍 No badges earned yet");
+
+        badgeOutput.innerHTML = badges.map(b => `<div class='badge'>${b}</div>`).join("");
+      } catch (e) {
+        console.error(e);
+        badgeOutput.innerHTML = `<strong>Error fetching wallet data: ${e.message}</strong>`;
+      } finally {
+        loader.style.display = "none";
+      }
+    }
+  </script>
+</body>
+</html>
